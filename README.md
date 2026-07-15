@@ -16,6 +16,17 @@ Built as a production-focused portfolio project for **Agentic AI, LLM
 orchestration, AIOps, SRE, observability, backend engineering, and MLOps**
 workflows.
 
+## Frontend preview
+
+<p align="center">
+  <img src="frontend-accepted-result.png" alt="Dashboard accepting a grounded incident investigation" width="49%">
+  <img src="frontend-rejected-result.png" alt="Dashboard rejecting an adversarial incident investigation" width="49%">
+</p>
+
+The dashboard makes the complete agent workflow visible: incident selection,
+Planner–Executor–Critic progress, confidence, routing decisions, investigation
+cost, savings, grounded root cause, and supporting evidence.
+
 ## Measured results
 
 Results from the deterministic offline evaluation in `eval/evaluate.py`:
