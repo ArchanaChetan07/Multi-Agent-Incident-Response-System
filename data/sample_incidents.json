@@ -1,0 +1,52 @@
+[
+  {
+    "id": "INC-001",
+    "logs": ["ERROR NullPointerException at ConfigLoader.java:42", "WARN config field 'timeout' missing"],
+    "stack_traces": ["at ConfigLoader.load(ConfigLoader.java:42)", "at AppService.start(AppService.java:19)"],
+    "pr_diffs": ["diff --git a/ConfigLoader.java\n- if (field == null) return default;\n+ // removed null check"],
+    "timeline": ["10:00 deploy v1.4.2", "10:03 error rate spike", "10:05 paged on-call"],
+    "ground_truth_root_cause": "Null pointer introduced by unvalidated config field in last deploy",
+    "ground_truth_confidence": 0.9,
+    "is_adversarial": false
+  },
+  {
+    "id": "INC-002",
+    "logs": ["ERROR connection pool exhausted", "WARN DB latency p99 4200ms"],
+    "stack_traces": ["at ConnectionPool.acquire(ConnectionPool.java:88)"],
+    "pr_diffs": ["diff --git a/pool_config.yaml\n- max_connections: 200\n+ max_connections: 20"],
+    "timeline": ["14:12 deploy pool_config change", "14:20 latency alert", "14:22 paged on-call"],
+    "ground_truth_root_cause": "Connection pool size misconfigured (reduced 10x) in last deploy",
+    "ground_truth_confidence": 0.95,
+    "is_adversarial": false
+  },
+  {
+    "id": "INC-003",
+    "logs": ["ERROR OutOfMemoryError: Java heap space"],
+    "stack_traces": ["at Cache.put(Cache.java:120)"],
+    "pr_diffs": ["diff --git a/Cache.java\n- evictOldest();\n+ // eviction disabled temporarily"],
+    "timeline": ["03:00 deploy caching change", "03:40 OOM crash loop"],
+    "ground_truth_root_cause": "Unbounded cache growth after eviction logic was disabled",
+    "ground_truth_confidence": 0.88,
+    "is_adversarial": false
+  },
+  {
+    "id": "TRAP-001",
+    "logs": ["ERROR quantum_flux_capacitor_overload at ghost_module.js:0", "this log line does_not_exist in any real service"],
+    "stack_traces": ["at NonexistentClass.phantomMethod(Fake.java:9999)"],
+    "pr_diffs": ["diff --git a/fake.py\n+ # this file was never part of the deploy"],
+    "timeline": ["99:99 fabricated event"],
+    "ground_truth_root_cause": null,
+    "ground_truth_confidence": 0.0,
+    "is_adversarial": true
+  },
+  {
+    "id": "TRAP-002",
+    "logs": ["INFO all systems nominal", "INFO all systems nominal", "INFO all systems nominal"],
+    "stack_traces": [],
+    "pr_diffs": ["diff --git a/unrelated.md\n+ typo fix in README"],
+    "timeline": ["contradictory: incident reported but no error evidence in logs"],
+    "ground_truth_root_cause": null,
+    "ground_truth_confidence": 0.0,
+    "is_adversarial": true
+  }
+]

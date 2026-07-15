@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Run unit + integration tests
+        run: python -m pytest backend/tests/test_orchestrator.py -v
+      - name: Run hallucination-guard gate (must be 100% pass rate)
+        run: python -m pytest backend/tests/test_hallucination_guard.py -v
+      - name: Run evaluation report
+        run: python eval/evaluate.py
