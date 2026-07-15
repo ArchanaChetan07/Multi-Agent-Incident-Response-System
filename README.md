@@ -1,54 +1,180 @@
 # Multi-Agent Incident Response System
 
-A cost-aware, hallucination-guarded multi-agent root-cause analysis platform.
-Planner → Executor → Critic agent loop, with cost-aware model routing,
-full OpenTelemetry tracing, and an adversarial hallucination-guard test suite.
+[![CI](https://github.com/ArchanaChetan07/Multi-Agent-Incident-Response-System/actions/workflows/ci.yml/badge.svg)](https://github.com/ArchanaChetan07/Multi-Agent-Incident-Response-System/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-14%2F14%20Passing-22C55E)
+![Hallucination Guard](https://img.shields.io/badge/Hallucination%20Guard-100%25-22C55E)
+
+An AI-powered incident triage and root-cause analysis platform that coordinates
+specialized **Planner, Executor, and Critic agents**. It grounds conclusions in
+operational evidence, rejects unsupported claims, routes difficult cases to a
+stronger model, and tracks the cost of every investigation.
+
+Built as a production-focused portfolio project for **Agentic AI, LLM
+orchestration, AIOps, SRE, observability, backend engineering, and MLOps**
+workflows.
+
+## Measured results
+
+Results from the deterministic offline evaluation in `eval/evaluate.py`:
+
+| Metric | Result |
+| --- | ---: |
+| Automated tests | **14/14 passed** |
+| Hallucination-guard pass rate | **100%** |
+| Recall on legitimate incidents | **100%** |
+| Precision | **66.7%** |
+| Cost savings vs. always-strong routing | **58.21%** |
+| Total evaluation cost | **$0.015191** |
+| Strong-model escalations | **2 of 5 incidents** |
+
+The evaluation set is intentionally small and deterministic. These figures
+validate pipeline behavior and regression safety; they are not production
+benchmark claims.
+
+## Why this project stands out
+
+- **Evidence-grounded RCA:** agents inspect incident logs, traces, and pull
+  request diffs before asserting a root cause.
+- **Hallucination resistance:** adversarial incidents test whether the Critic
+  rejects inconsistent or unverifiable evidence.
+- **Cost-aware model routing:** starts with an economical model and escalates
+  only when confidence falls below the configured threshold.
+- **Fail-closed LLM handling:** malformed or markdown-wrapped model responses
+  cannot silently bypass validation.
+- **Production-ready API controls:** optional bearer authentication, CORS
+  allowlists, payload limits, retries, timeouts, health checks, and cost caps.
+- **Observable agent decisions:** OpenTelemetry spans capture planning,
+  tool execution, criticism, routing, and final confidence.
+- **Reproducible delivery:** pinned dependencies, Docker Compose, non-root
+  containers, and GitHub Actions CI.
 
 ## Architecture
 
+```mermaid
+flowchart LR
+    UI[Triage Dashboard] -->|HTTP| API[FastAPI Service]
+    API --> ORCH[Investigation Orchestrator]
+    ORCH --> PLAN[Planner Agent]
+    PLAN --> EXEC[Executor Agent]
+    EXEC --> TOOLS[Logs / Traces / PR Diff Tools]
+    TOOLS --> CRITIC[Critic Agent]
+    CRITIC --> ROUTER{Confidence Gate}
+    ROUTER -->|High confidence| REPORT[Grounded RCA Report]
+    ROUTER -->|Low confidence| STRONG[Strong Model Escalation]
+    STRONG --> CRITIC
+    ORCH --> COST[Cost & Savings Tracker]
+    ORCH --> OTEL[OpenTelemetry Spans]
 ```
-frontend (index.html)  --HTTP-->  backend (FastAPI)  --calls-->  orchestrator
-                                                                     |
-                                                       planner -> executor -> critic
-                                                                     |
-                                                            LLM client (real API or
-                                                            deterministic offline mock)
-                                                                     |
-                                                        OpenTelemetry spans -> Jaeger
+
+The default LLM client is a deterministic offline mock, so the complete system
+can run without an API key or network calls. Setting `ANTHROPIC_API_KEY`
+activates the real Anthropic client.
+
+## Technology stack
+
+| Area | Technologies |
+| --- | --- |
+| AI orchestration | Multi-agent workflow, prompt engineering, confidence-based routing |
+| Backend | Python 3.12, FastAPI, Pydantic, Uvicorn |
+| Reliability | Exponential backoff, typed errors, cost ceilings, fail-closed parsing |
+| Observability | OpenTelemetry tracing, structured JSON logging, Jaeger-ready deployment |
+| Testing | Pytest, FastAPI TestClient, adversarial evaluation |
+| DevOps | Docker, Docker Compose, GitHub Actions CI |
+| Frontend | HTML5, CSS3, vanilla JavaScript |
+
+## Agent workflow
+
+1. **Planner** decomposes an incident into evidence-gathering subtasks.
+2. **Executor** runs allowlisted tools against logs, traces, and code changes.
+3. **Critic** checks evidence consistency and produces a verdict with confidence.
+4. **Router** accepts high-confidence reports or escalates uncertain cases.
+5. **Orchestrator** returns the final root cause, evidence, cost, and savings.
+
+## Quick start
+
+### Local development
+
+```bash
+git clone https://github.com/ArchanaChetan07/Multi-Agent-Incident-Response-System.git
+cd Multi-Agent-Incident-Response-System
+
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+
+pip install -r backend/requirements.txt
+cd backend
+uvicorn app.main:app --reload --port 8000
 ```
 
-- **backend/app/models.py** — Phase 1: canonical `Incident` schema + dataset loader
-- **backend/app/agents/** — Phase 2: planner, executor, critic
-- **backend/app/routing.py** — Phase 3: cost-aware model routing + savings tracking
-- **backend/app/tracing.py** — Phase 4: OpenTelemetry setup
-- **backend/tests/test_hallucination_guard.py** — Phase 5: adversarial test suite
-- **backend/app/main.py** — Phase 6: FastAPI service
-- **frontend/index.html** — Phase 7: triage dashboard
-- **eval/evaluate.py** — Phase 8: precision/recall + guard pass-rate + cost report
-- **docker-compose.yml, .github/workflows/ci.yml** — Phase 9: infra + CI
+In a second terminal:
 
-## Production hardening (v1.1)
-
-This revision closes several gaps found in a production-readiness review:
-
-| Issue | Fix |
-|---|---|
-| `GET /report` silently re-ran the full (costly, non-deterministic) pipeline on every call | Reports are now cached on `/investigate` and `/report` returns the cached result; 404s if no investigation has run yet |
-| LLM JSON parsing crashed on markdown-fenced or preamble-prefixed model output | `LLMResponse.json()` robustly extracts JSON; agents fail closed (planner uses a default plan, critic defaults to **reject**) on parse failure |
-| No retry/timeout handling on real API calls | Exponential backoff on 429/5xx/network errors, explicit timeout, typed `LLMError` |
-| No cost ceiling | `MAX_COST_PER_INCIDENT_USD` aborts/skips escalation if a single incident's pipeline cost exceeds the cap |
-| CORS wildcard, no auth | `ALLOWED_ORIGINS` and optional `API_AUTH_TOKEN` bearer-auth via env vars |
-| No input validation | Payload field/item length caps reject oversized log/diff submissions (422) |
-| No persistence | Runtime incidents + reports persist to a JSON-backed store (`DB_PATH`, atomic writes, thread-safe) surviving restarts |
-| Docker ran as root, no healthcheck tooling | Non-root user, `curl`-based `HEALTHCHECK`, `.dockerignore` |
-| No structured logging | JSON-formatted logs via `logging_setup.py` |
-| No API-level tests | `backend/tests/test_api.py` covers auth, validation, 404s, and the report-caching regression |
-
-Relevant env vars (all optional, sane defaults for local dev):
-
+```bash
+cd frontend
+python -m http.server 8080
 ```
-ALLOWED_ORIGINS=https://yourapp.com,https://admin.yourapp.com
-API_AUTH_TOKEN=some-long-random-token
+
+Open:
+
+- Dashboard: `http://127.0.0.1:8080`
+- API documentation: `http://127.0.0.1:8000/docs`
+- Health endpoint: `http://127.0.0.1:8000/health`
+
+### Docker Compose
+
+```bash
+docker compose up --build
+```
+
+- API: `http://localhost:8000`
+- Frontend: `http://localhost:8080`
+- Jaeger UI: `http://localhost:16686`
+
+The application currently emits spans through `ConsoleSpanExporter`. To send
+them to Jaeger, install the OTLP exporter and configure
+`OTLPSpanExporter(endpoint="http://jaeger:4317", insecure=True)` in
+`backend/app/tracing.py`.
+
+## API endpoints
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `GET` | `/incidents` | List available incidents |
+| `POST` | `/incidents` | Validate and create an incident |
+| `POST` | `/incidents/{id}/investigate` | Run the multi-agent investigation |
+| `GET` | `/incidents/{id}/report` | Return the cached investigation report |
+| `GET` | `/health` | Liveness probe |
+| `GET` | `/ready` | Dataset and persistence readiness probe |
+
+## Testing and evaluation
+
+Run the complete test suite:
+
+```bash
+python -m pytest backend/tests -v
+```
+
+Run the measurable evaluation:
+
+```bash
+python eval/evaluate.py
+```
+
+Test coverage includes API authentication, input validation, report caching,
+orchestration behavior, legitimate-incident acceptance, and adversarial
+hallucination rejection.
+
+## Configuration
+
+All settings are optional for offline development:
+
+```env
+ANTHROPIC_API_KEY=
+ALLOWED_ORIGINS=http://127.0.0.1:8080
+API_AUTH_TOKEN=
 CONFIDENCE_THRESHOLD=0.6
 MAX_COST_PER_INCIDENT_USD=1.00
 MAX_FIELD_ITEMS=500
@@ -59,75 +185,59 @@ LLM_TIMEOUT_SECONDS=30
 LOG_LEVEL=INFO
 ```
 
-## Quickstart (local, no API key required)
+Never commit API keys. Use repository secrets or your deployment platform's
+secret manager for production credentials.
 
-The system runs fully offline using a deterministic mock LLM client so you can
-develop, test, and evaluate without spending on API calls or needing network
-access. Set `ANTHROPIC_API_KEY` to switch to real model calls.
+## Project structure
 
-```bash
-cd backend
-pip install -r requirements.txt
-
-# Run the API
-uvicorn app.main:app --reload --port 8000
-
-# In another terminal, serve the frontend
-cd ../frontend && python -m http.server 8080
-# open http://localhost:8080  (dashboard talks to http://127.0.0.1:8000)
+```text
+.
+├── backend/
+│   ├── app/
+│   │   ├── agents/          # Planner, Executor, and Critic
+│   │   ├── llm_client.py    # Offline mock and Anthropic client
+│   │   ├── orchestrator.py  # Agent loop and escalation
+│   │   ├── routing.py       # Cost-aware model selection
+│   │   ├── tracing.py       # OpenTelemetry instrumentation
+│   │   └── main.py          # FastAPI application
+│   ├── tests/               # API, orchestration, and guard tests
+│   └── Dockerfile
+├── data/                    # Labeled sample incidents
+├── eval/evaluate.py         # Precision, recall, safety, and cost metrics
+├── frontend/index.html      # Incident triage dashboard
+├── docker-compose.yml
+└── .github/workflows/ci.yml
 ```
 
-## Run tests
+## Production engineering decisions
 
-```bash
-python -m pytest backend/tests/ -v
-```
+- Investigation reports are cached instead of recomputed by `GET` requests.
+- Runtime data uses atomic, lock-protected JSON persistence.
+- Real LLM calls use explicit timeouts and exponential retry backoff.
+- A per-incident cost ceiling prevents uncontrolled model escalation.
+- Oversized logs, traces, and diffs are rejected during validation.
+- The Docker API runs as a non-root user and exposes a health check.
+- Structured logs and trace spans make agent decisions auditable.
 
-## Run the evaluation report
+## Roadmap
 
-```bash
-python eval/evaluate.py
-```
+- Configure OTLP export to Jaeger by default.
+- Add real log, trace, and deployment-provider adapters.
+- Replace JSON persistence with PostgreSQL for multi-instance deployments.
+- Add role-based access control and audit-log retention.
+- Expand the labeled benchmark dataset and report confidence calibration.
+- Add streaming investigation progress to the dashboard.
 
-Outputs precision/recall vs. ground truth, hallucination-guard pass rate,
-and cost-aware-routing savings vs. an always-escalate baseline.
+## Resume-ready project summary
 
-## Run with Docker
+> Engineered a production-hardened multi-agent incident response platform using
+> Python, FastAPI, Pydantic, OpenTelemetry, Docker, and GitHub Actions.
+> Implemented evidence-grounded Planner–Executor–Critic orchestration,
+> adversarial hallucination guards, confidence-based model escalation, and
+> per-incident cost controls; achieved 100% guard pass rate, 100% recall, and
+> 58.21% routing-cost savings on a deterministic evaluation suite.
 
-```bash
-docker-compose up --build
-# API:      http://localhost:8000
-# Frontend: http://localhost:8080
-# Jaeger UI: http://localhost:16686
-```
+## Author
 
-To export real traces to Jaeger instead of the console, swap
-`ConsoleSpanExporter` for `OTLPSpanExporter(endpoint="jaeger:4317", insecure=True)`
-in `backend/app/tracing.py`.
-
-## Using the real Anthropic API
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-uvicorn app.main:app --reload
-```
-
-The `llm_client.py` module detects the env var automatically and routes real
-calls through `api.anthropic.com`. Cost accounting uses the pricing table in
-that file — update it if pricing changes.
-
-## Extending the dataset (Phase 1)
-
-Add new entries to `data/sample_incidents.json` following the `Incident`
-schema. Set `"is_adversarial": true` for deliberately fabricated/misleading
-incidents used by the hallucination-guard suite.
-
-## Runbook notes
-
-- **Rotating keys:** set `ANTHROPIC_API_KEY` via your deployment platform's
-  secrets manager — never commit it.
-- **Adding a new tool for the Executor agent:** add a function to
-  `backend/app/agents/executor.py`'s `TOOLS` dict and reference it from the
-  Planner's subtask types.
-- **Adjusting the escalation threshold:** `CONFIDENCE_THRESHOLD` in
-  `backend/app/routing.py`.
+**Archana Chetan**  
+GitHub: [@ArchanaChetan07](https://github.com/ArchanaChetan07)
